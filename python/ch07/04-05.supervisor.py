@@ -6,6 +6,9 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 from pydantic import BaseModel
 
 
+MAX_ROUNDS = 3
+
+
 class SupervisorDecision(BaseModel):
     next: Literal["researcher", "coder", "FINISH"]
 
@@ -39,9 +42,14 @@ supervisor_system_prompt = SystemMessage(
 # 에이전트 상태 정의
 class AgentState(MessagesState):
     next: Literal["researcher", "coder", "FINISH"]
+    rounds: int
 
 
 def supervisor(state: AgentState) -> AgentState:
+    # 방어 로직: 최대 라운드 도달 시 강제 종료
+    if state.get("rounds", 0) >= MAX_ROUNDS:
+        return {"next": "FINISH"}
+
     messages = [
         supervisor_system_prompt,
         *state["messages"],
@@ -59,7 +67,11 @@ def researcher(state: AgentState) -> AgentState:
         "관련 데이터를 찾는 중입니다... 잠시만 기다려주세요."
         f"\n찾은 데이터: {fake_data}"
     )
-    return {"messages": [AIMessage(content=content)]}
+    return {
+        "messages": [AIMessage(content=content)],
+        "rounds": state.get("rounds", 0) + 1,
+        "next": "supervisor",
+    }
 
 
 def coder(state: AgentState) -> AgentState:
@@ -82,7 +94,11 @@ data = {'USA': 331, 'China': 1400, 'India': 1300}
 visualize_population(data)
 """
     content = "코드를 작성 중입니다... 잠시만 기다려주세요." + f"\n작성된 코드:\n{fake_code}"
-    return {"messages": [AIMessage(content=content)]}
+    return {
+        "messages": [AIMessage(content=content)],
+        "rounds": state.get("rounds", 0) + 1,
+        "next": "supervisor",
+    }
 
 
 def route_next(state: AgentState) -> Literal["researcher", "coder", END]:
@@ -108,6 +124,7 @@ if __name__ == "__main__":
     initial_state: AgentState = {
         "messages": [HumanMessage(content="전세계 인구를 국적을 기준으로 시각화 해주세요.")],
         "next": "researcher",
+        "rounds": 0,
     }
 
     for output in graph.stream(initial_state):
@@ -116,3 +133,4 @@ if __name__ == "__main__":
         if node_result.get("messages"):
             print(f"응답: {node_result['messages'][-1].content[:100]}...")
         print(f"다음 단계: {node_result.get('next', 'N/A')}")
+        print(f"진행 라운드: {node_result.get('rounds', 'N/A')}/{MAX_ROUNDS}")
