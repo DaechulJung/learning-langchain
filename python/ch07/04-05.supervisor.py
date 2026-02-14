@@ -31,6 +31,10 @@ system_prompt_part_2 = (
     f"아니면 FINISH 해야 합니까? 서브에이전트: {', '.join(agents)}, FINISH"
 )
 
+supervisor_system_prompt = SystemMessage(
+    content=f"{system_prompt_part_1}\n\n{system_prompt_part_2}"
+)
+
 
 # 에이전트 상태 정의
 class AgentState(MessagesState):
@@ -39,9 +43,8 @@ class AgentState(MessagesState):
 
 def supervisor(state: AgentState) -> AgentState:
     messages = [
-        SystemMessage(content=system_prompt_part_1),
+        supervisor_system_prompt,
         *state["messages"],
-        SystemMessage(content=system_prompt_part_2),
     ]
     decision = model_with_structured_output.invoke(messages)
     return {"next": decision.next}
