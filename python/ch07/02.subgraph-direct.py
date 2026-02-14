@@ -1,5 +1,6 @@
 from typing import TypedDict
-from langgraph.graph import START, StateGraph
+
+from langgraph.graph import END, START, StateGraph
 
 
 # 부모 그래프와 서브그래프에서 사용할 상태
@@ -13,7 +14,7 @@ class SubgraphState(TypedDict):
 
 
 # 서브그래프 정의
-def subgraph_node(state: SubgraphState):
+def subgraph_node(state: SubgraphState) -> State:
     # 서브그래프 노드는 공유 키인 "foo"를 사용해 부모 그래프와 통신한다
     return {"foo": state["foo"] + "bar"}
 
@@ -21,14 +22,14 @@ def subgraph_node(state: SubgraphState):
 subgraph_builder = StateGraph(SubgraphState)
 subgraph_builder.add_node("subgraph_node", subgraph_node)
 subgraph_builder.add_edge(START, "subgraph_node")
-# 서브그래프에 필요한 추가 설정은 여기에 작성
+subgraph_builder.add_edge("subgraph_node", END)
 subgraph = subgraph_builder.compile()
 
 # 부모 그래프 정의
 builder = StateGraph(State)
 builder.add_node("subgraph", subgraph)
 builder.add_edge(START, "subgraph")
-# 부모 그래프에 필요한 추가 설정은 여기에 작성
+builder.add_edge("subgraph", END)
 graph = builder.compile()
 
 # 예시
